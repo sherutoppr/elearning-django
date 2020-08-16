@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Chat room for "{{ course.title }}"{% endblock %}
+
+{% block content %}
+    <div id="chat"></div>
+    <div id="chat-input">
+    <input id="chat-message-input" type="text">
+    <input id="chat-message-submit" type="submit" value="Send">
+    </div>
+{% endblock %}
+
+{% block domready %}
+var url = 'ws://' + window.location.host + '/ws/chat/room/' + '{{ course.id }}/';
+var chatSocket = new WebSocket(url);
+
+{#    fired when messagae is received, parse message, then append message to chet-log and scroll to new message  #}
+chatSocket.onmessage = function(e) {
+    var data = JSON.parse(e.data);
+    var message = data.message;
+
+    var dateOptions = {hour: 'numeric', minute: 'numeric', hour12: true};
+    // convert the datetime into javascript data object
+    var datetime = new Date(data['datetime']).toLocaleString('en',dateOptions);
+    var isMe = data.user === '{{ request.user }}';
+    var source = isMe ? 'me' : 'other';
+    var name = isMe ? 'Me' : data.user;
+
+
+    var $chat = $('#chat');
+    $chat.append('<div class="message ' + source + '">' +
+                 '<strong>' + name + '</strong> ' +
+                 '<span class="date">' + datetime + '</span><br>' +
+                 message +
+                 '</div>');
+    $chat.scrollTop($chat[0].scrollHeight);
+};
+
+{#     fired when connection with websocket is closed #}
+chatSocket.onclose = function(e) {
+    console.error('Chat socket closed unexpectedly');
+};
+
+{#    sent message to the socket #}
+
+var $input = $('#chat-message-input');
+var $submit = $('#chat-message-submit');
+
+{#    when submit button is clicked #}
+$submit.click(function() {
+    // read the input message and check if it has sth or not
+    var message = $input.val();
+    if(message) {
+        // send message in JSON format
+        chatSocket.send(JSON.stringify({'message': message}));
+
+        // clear input
+        $input.val('');
+
+        // return focus
+        $input.focus();
+    }
+});
+
+{#     instead of submit , user can enter and click() is fired #}
+$input.focus();
+$input.keyup(function(e) {
+    if (e.which === 13) {
+    // submit with enter/return key
+    $submit.click();
+    }
+});
+{% endblock %}
